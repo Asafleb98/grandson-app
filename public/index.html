@@ -206,7 +206,16 @@
         requestWakeLock(); 
     };
 
+// משתנה עזר לזכור אם זו הפעם הראשונה
+    let isFirstTime = true;
+
     recognition.onend = () => { 
+        // שינוי הטקסט בהתאם למצב
+        if (isFirstTime) {
+            document.querySelector('#micBtn span').nextSibling.textContent = " להמשך שיחה";
+            isFirstTime = false;
+        }
+        
         statusDiv.innerText = ""; 
         waves.style.display = 'none'; 
     };

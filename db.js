@@ -1,9 +1,11 @@
 require('dotenv').config();
 const { Pool } = require('pg');
 
+const isProduction = process.env.DATABASE_URL.includes('neon.tech');
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  // מחקנו את ה-ssl שהיה כאן קודם
+  ssl: isProduction ? { rejectUnauthorized: false } : false
 });
 
 pool.connect((err, client, release) => {
@@ -15,7 +17,7 @@ pool.connect((err, client, release) => {
     if (err) {
       return console.error('Error executing query', err.stack);
     }
-    console.log('✅ Connected to LOCAL PostgreSQL successfully!');
+    console.log(isProduction ? '✅ Connected to NEON (Cloud)!' : '✅ Connected to LOCAL DB!');
   });
 });
 
