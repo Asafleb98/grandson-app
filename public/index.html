@@ -155,7 +155,7 @@
     
     <div class="buttons-row">
         <button id="micBtn" class="big-button mic-btn" onclick="startListening()">
-            <span>🎤</span> אני מקשיב
+            <span>🎤</span>
         </button>
 
         <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;" onchange="handleImageUpload(this)">
@@ -180,109 +180,119 @@
 </div>
 
 <script>
-    const statusDiv = document.getElementById('status');
+    const statusDiv = document.getElementById('status'); 
     const responseDiv = document.getElementById('response-area');
     const previewImg = document.getElementById('preview');
-    const waves = document.getElementById('listening-indicator');
+    const waves = document.getElementById('listening-indicator'); 
     const dots = document.getElementById('thinking-indicator');
+    
+    // נגן האודיו הגלובלי
+    const audioPlayer = new Audio();
 
     // Wake Lock
     let wakeLock = null;
-    async function requestWakeLock() {
-        try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } 
-        catch (err) { console.log(err); }
-    }
+    async function requestWakeLock() { try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) { console.log(err); }}
 
-    // --- Speech Logic ---
+    // Speech Recognition
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
+    const recognition = new SpeechRecognition(); 
     recognition.lang = 'he-IL'; 
     
+    // משתנה עזר לשינוי הטקסט בכפתור
+    let isFirstTime = true;
+
     recognition.onstart = () => { 
         statusDiv.innerText = "אני מקשיב לך..."; 
         waves.style.display = 'flex'; 
-        dots.style.display = 'none'; // הסתרת אנימציית חשיבה אם הייתה
-        responseDiv.style.display = 'none';
+        dots.style.display = 'none'; 
+        responseDiv.style.display = 'none'; 
         requestWakeLock(); 
     };
 
-// משתנה עזר לזכור אם זו הפעם הראשונה
-    let isFirstTime = true;
-
     recognition.onend = () => { 
-        // שינוי הטקסט בהתאם למצב
+        // עדכון הכפתור לפעם הבאה
         if (isFirstTime) {
-            document.querySelector('#micBtn span').nextSibling.textContent = " להמשך שיחה";
+            const btnSpan = document.querySelector('#micBtn span');
+            if(btnSpan && btnSpan.nextSibling) {
+                btnSpan.nextSibling.textContent = " להמשך שיחה";
+            }
             isFirstTime = false;
         }
-        
+
         statusDiv.innerText = ""; 
         waves.style.display = 'none'; 
     };
 
-    recognition.onresult = (e) => {
-        const text = e.results[0][0].transcript;
-        statusDiv.innerText = "שמעתי: " + text;
-        sendToBackend(text, null);
+    recognition.onresult = (e) => { 
+        const text = e.results[0][0].transcript; 
+        statusDiv.innerText = "שמעתי: " + text; 
+        sendToBackend(text, null); 
     };
 
-    function startListening() { recognition.start(); }
+    function startListening() { 
+        // --- התיקון למובייל מתחיל כאן ---
+        // ברגע הלחיצה, אנחנו מנגנים "כלום" כדי לשחרר את חסימת האודיו
+        audioPlayer.src = 'data:audio/mp3;base64,'; // קובץ ריק
+        audioPlayer.play().catch(() => {}); // מתעלמים משגיאות אם יש
+        // --- סוף התיקון ---
 
-    // --- Camera Logic ---
-    function handleImageUpload(input) {
-        if (input.files && input.files[0]) {
-            const file = input.files[0];
-            const reader = new FileReader();
+        recognition.start(); 
+    }
+
+    // Camera Logic
+    function handleImageUpload(input) { 
+        if (input.files && input.files[0]) { 
+            const file = input.files[0]; 
+            const reader = new FileReader(); 
             
-            statusDiv.innerText = "מעבד תמונה...";
-            requestWakeLock();
-            
-            reader.onload = function(e) {
-                previewImg.src = e.target.result;
-                previewImg.style.display = 'block';
-                sendToBackend("מה עושים עם זה?", e.target.result);
-            }
+            // גם כאן משחררים את האודיו
+            audioPlayer.src = 'data:audio/mp3;base64,';
+            audioPlayer.play().catch(() => {});
+
+            statusDiv.innerText = "מעבד תמונה..."; 
+            requestWakeLock(); 
+            reader.onload = function(e) { 
+                previewImg.src = e.target.result; 
+                previewImg.style.display = 'block'; 
+                sendToBackend("מה עושים עם זה?", e.target.result); 
+            }; 
             reader.readAsDataURL(file); 
         }
     }
 
-    // --- Backend & Audio Logic ---
+    // Backend Logic
     async function sendToBackend(text, imageBase64) {
-        // 1. הסתרת תשובה ישנה
-        responseDiv.style.display = 'none';
+        responseDiv.style.display = 'none'; 
+        statusDiv.innerText = "הנכד חושב..."; 
+        dots.style.display = 'flex'; 
         
-        // 2. הצגת חיווי חשיבה
-        statusDiv.innerText = "הנכד חושב...";
-        dots.style.display = 'flex'; // מפעיל את הנקודות הקופצות
-        
-        window.speechSynthesis.cancel(); 
+        // עצירת דיבור קודם אם יש
+        audioPlayer.pause();
+        audioPlayer.currentTime = 0;
 
         try {
-            const res = await fetch('/api/ask', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+            const res = await fetch('/api/ask', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
                 body: JSON.stringify({ userMessage: text, image: imageBase64 }) 
             });
-
             const data = await res.json();
             
-            // 3. קיבלנו תשובה - מכבים את הנקודות
-            dots.style.display = 'none';
-            statusDiv.innerText = "";
-
-            // 4. מציגים את התשובה
-            responseDiv.style.display = 'block';
+            dots.style.display = 'none'; 
+            statusDiv.innerText = ""; 
+            responseDiv.style.display = 'block'; 
             responseDiv.innerText = data.answer;
             
-            if (data.audio) {
-                const audio = new Audio("data:audio/mp3;base64," + data.audio);
-                audio.play();
+            if (data.audio) { 
+                // שימוש באותו נגן שכבר "שוחרר" קודם
+                audioPlayer.src = "data:audio/mp3;base64," + data.audio;
+                audioPlayer.play().catch(e => console.error("Audio play failed:", e)); 
             }
-        } catch (error) {
-            console.error(error);
-            dots.style.display = 'none';
-            responseDiv.innerText = "יש תקלה בחיבור.";
-            responseDiv.style.display = 'block';
+        } catch (error) { 
+            console.error(error); 
+            dots.style.display = 'none'; 
+            responseDiv.innerText = "יש תקלה בחיבור."; 
+            responseDiv.style.display = 'block'; 
         }
     }
 </script>
