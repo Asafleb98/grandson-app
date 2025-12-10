@@ -6,15 +6,20 @@
     <title>הנכד הדיגיטלי</title>
     <style>
         :root { --primary-color: #007AFF; --success-color: #34C759; --bg-color: #F2F2F7; --text-color: #1C1C1E; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; user-select: none; -webkit-user-select: none; }
         .container { width: 100%; max-width: 600px; background: white; padding: 30px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; margin-top: 20px; }
         h1 { font-size: 2.2rem; margin-bottom: 5px; color: #333; }
         p { font-size: 1.2rem; color: #666; margin-bottom: 30px; }
-        .buttons-row { display: flex; flex-direction: column; gap: 15px; align-items: center;}
-        .big-button { border: none; color: white; width: 100%; max-width: 350px; height: 90px; font-size: 1.6rem; font-weight: bold; border-radius: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 15px; transition: transform 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+        
+        .buttons-row { display: flex; flex-direction: column; gap: 15px; align-items: center; width: 100%; }
+        
+        .big-button { border: none; color: white; width: 100%; max-width: 350px; height: 90px; font-size: 1.6rem; font-weight: bold; border-radius: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 15px; transition: transform 0.1s, background-color 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.15); touch-action: none; /* מונע גלילה בלחיצה */ }
+        
         .mic-btn { background-color: var(--primary-color); }
+        .mic-btn:active, .mic-btn.pressed { background-color: #0056b3; transform: scale(0.96); }
+        
         .cam-btn { background-color: var(--success-color); }
-        .big-button:active { transform: scale(0.96); }
+        .cam-btn:active { transform: scale(0.96); }
         
         /* אנימציות */
         .listening-waves { display: none; margin: 20px auto; height: 40px; align-items: center; justify-content: center; gap: 5px; }
@@ -35,10 +40,8 @@
 <body>
 <div class="container">
     <h1>הנכד הדיגיטלי 👵</h1>
-    <p>לחצי על הכפתור ודברי איתי</p>
-    
-    <div class="buttons-row">
-        <button id="micBtn" class="big-button mic-btn" onclick="startListening()"><span>🎤</span> אני מקשיב</button>
+    <p>לחצי והחזיקי כדי לדבר</p> <div class="buttons-row">
+        <button id="micBtn" class="big-button mic-btn"><span>🎤</span> החזיקי ודברי</button>
         
         <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;" onchange="handleImageUpload(this)">
         <button class="big-button cam-btn" onclick="openCamera()"><span>📷</span> תראה לי</button>
@@ -58,61 +61,103 @@
     const previewImg = document.getElementById('preview');
     const waves = document.getElementById('listening-indicator'); 
     const dots = document.getElementById('thinking-indicator');
+    const micBtn = document.getElementById('micBtn'); // תפסנו את הכפתור
     
-    // נגן גלובלי
     const audioPlayer = new Audio();
-
     let wakeLock = null;
+    let isRecording = false;
+
     async function requestWakeLock() { try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) { console.log(err); }}
 
-    // --- לוגיקה חדשה למצלמה ---
-    function openCamera() {
-        // 1. זה הטריק: מפעילים אודיו ריק ברגע הלחיצה על הכפתור (לפני שהמצלמה נפתחת)
+    // --- לוגיקה חדשה: Push to Talk ---
+    
+    // 1. התחלת לחיצה (עכבר או מגע)
+    function startRecord(e) {
+        if (e.cancelable) e.preventDefault(); // מונע גלילה בנייד
+        if (isRecording) return; // מניעת כפילויות
+        
+        isRecording = true;
+        micBtn.classList.add('pressed'); // אפקט ויזואלי של לחיצה
+        micBtn.innerHTML = "<span>👂</span> אני מקשיב..."; 
+
+        // שחרור חסימת אודיו
         audioPlayer.src = 'data:audio/mp3;base64,';
         audioPlayer.play().catch(() => {});
+
+        try {
+            recognition.start();
+        } catch (err) {
+            console.log("Recognition already started");
+        }
+    }
+
+    // 2. סיום לחיצה (שחרור)
+    function stopRecord(e) {
+        if (!isRecording) return;
+        isRecording = false;
         
-        // 2. רק עכשיו פותחים את המצלמה האמיתית
+        micBtn.classList.remove('pressed');
+        micBtn.innerHTML = "<span>🎤</span> החזיקי ודברי"; // החזרת הטקסט
+        
+        try {
+            recognition.stop(); // זה הפקודה שגורמת לזיהוי להסתיים מיד!
+        } catch(err) {
+            console.log(err);
+        }
+    }
+
+    // חיבור האירועים לכפתור
+    micBtn.addEventListener('mousedown', startRecord);
+    micBtn.addEventListener('touchstart', startRecord);
+
+    micBtn.addEventListener('mouseup', stopRecord);
+    micBtn.addEventListener('touchend', stopRecord);
+    micBtn.addEventListener('mouseleave', stopRecord); // אם הגרירה יצאה מהכפתור
+
+    // --- מצלמה ---
+    function openCamera() {
+        audioPlayer.src = 'data:audio/mp3;base64,';
+        audioPlayer.play().catch(() => {});
         document.getElementById('cameraInput').click();
     }
 
-    // Speech
+    // Speech Setup
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition(); 
     recognition.lang = 'he-IL'; 
+    recognition.interimResults = false; // אנחנו רוצים רק את התוצאה הסופית בשחרור
     
-    let isFirstTime = true;
-
     recognition.onstart = () => { 
-        statusDiv.innerText = "אני מקשיב לך..."; waves.style.display = 'flex'; dots.style.display = 'none'; responseDiv.style.display = 'none'; requestWakeLock(); 
+        statusDiv.innerText = "מקשיב..."; 
+        waves.style.display = 'flex'; 
+        dots.style.display = 'none'; 
+        responseDiv.style.display = 'none'; 
+        requestWakeLock(); 
     };
+
     recognition.onend = () => { 
-        if (isFirstTime) {
-            const btnSpan = document.querySelector('#micBtn span');
-            if(btnSpan && btnSpan.nextSibling) btnSpan.nextSibling.textContent = " להמשך שיחה";
-            isFirstTime = false;
+        // ניקוי המצב במקרה שהזיהוי נפסק לבד
+        if (isRecording) {
+            isRecording = false;
+            micBtn.classList.remove('pressed');
+            micBtn.innerHTML = "<span>🎤</span> החזיקי ודברי";
         }
-        statusDiv.innerText = ""; waves.style.display = 'none'; 
+        statusDiv.innerText = ""; 
+        waves.style.display = 'none'; 
     };
+
     recognition.onresult = (e) => { 
         const text = e.results[0][0].transcript; 
         statusDiv.innerText = "שמעתי: " + text; 
         sendToBackend(text, null); 
     };
 
-    function startListening() { 
-        audioPlayer.src = 'data:audio/mp3;base64,'; // שחרור חסימה גם כאן
-        audioPlayer.play().catch(() => {});
-        recognition.start(); 
-    }
-
-    // Camera Upload Handling
+    // Camera Upload
     function handleImageUpload(input) { 
         if (input.files && input.files[0]) { 
             const file = input.files[0]; 
             const reader = new FileReader(); 
-            
-            statusDiv.innerText = "מעבד תמונה..."; 
-            requestWakeLock(); 
+            statusDiv.innerText = "מעבד תמונה..."; requestWakeLock(); 
             reader.onload = function(e) { 
                 previewImg.src = e.target.result; 
                 previewImg.style.display = 'block'; 
@@ -145,7 +190,6 @@
             responseDiv.innerText = data.answer;
             
             if (data.audio) { 
-                // שימוש באותו נגן ששוחרר קודם
                 audioPlayer.src = "data:audio/mp3;base64," + data.audio;
                 audioPlayer.play().catch(e => console.error("Play error:", e)); 
             }
