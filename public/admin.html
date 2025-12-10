@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ניהול הנכד הדיגיטלי</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f4f9; padding: 20px; max-width: 800px; margin: 0 auto; }
+        h1 { text-align: center; color: #333; }
+        .card { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        
+        label { display: block; margin-top: 15px; font-weight: bold; color: #555; }
+        input, textarea { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ddd; border-radius: 5px; font-size: 16px; font-family: inherit; }
+        textarea { height: 100px; resize: vertical; }
+        
+        button { 
+            margin-top: 25px; width: 100%; padding: 15px; background-color: #007bff; color: white; 
+            border: none; border-radius: 5px; font-size: 18px; cursor: pointer; transition: 0.3s; 
+        }
+        button:hover { background-color: #0056b3; }
+        
+        .success-msg { color: green; text-align: center; margin-top: 10px; display: none; font-weight: bold;}
+        .back-link { display: block; text-align: center; margin-top: 20px; color: #666; text-decoration: none; }
+    </style>
+</head>
+<body>
+
+    <h1>⚙️ הגדרות הנכד הדיגיטלי</h1>
+
+    <div class="card">
+        <label>📺 מידע על הטלוויזיה והממיר:</label>
+        <textarea id="tvInfo"></textarea>
+
+        <label>🌐 מידע על האינטרנט והראוטר:</label>
+        <textarea id="netInfo"></textarea>
+
+        <label>📝 הערות אישיות (רגישויות, העדפות):</label>
+        <textarea id="notesInfo"></textarea>
+
+        <button onclick="saveProfile()">שמור שינויים</button>
+        <div id="msg" class="success-msg">הנתונים נשמרו בהצלחה! ✅</div>
+    </div>
+
+    <a href="/" class="back-link">חזרה לממשק של סבתא</a>
+
+    <script>
+        // 1. טעינת הנתונים הקיימים בעת פתיחת הדף
+        async function loadData() {
+            const res = await fetch('/api/profile');
+            const data = await res.json();
+            
+            document.getElementById('tvInfo').value = data.tv_info;
+            document.getElementById('netInfo').value = data.internet_info;
+            document.getElementById('notesInfo').value = data.general_notes;
+        }
+
+        // 2. שמירת הנתונים
+        async function saveProfile() {
+            const updatedData = {
+                tv_info: document.getElementById('tvInfo').value,
+                internet_info: document.getElementById('netInfo').value,
+                general_notes: document.getElementById('notesInfo').value
+            };
+
+            await fetch('/api/profile', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatedData)
+            });
+
+            const msgDiv = document.getElementById('msg');
+            msgDiv.style.display = 'block';
+            setTimeout(() => msgDiv.style.display = 'none', 3000);
+        }
+
+        loadData();
+    </script>
+
+</body>
+</html>
