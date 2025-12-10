@@ -5,174 +5,47 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>הנכד הדיגיטלי</title>
     <style>
-        :root {
-            --primary-color: #007AFF;
-            --success-color: #34C759;
-            --bg-color: #F2F2F7;
-            --text-color: #1C1C1E;
-        }
-
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color); 
-            color: var(--text-color);
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-        }
-
-        .container { 
-            width: 100%;
-            max-width: 600px;
-            background: white; 
-            padding: 30px; 
-            border-radius: 25px; 
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            text-align: center;
-            margin-top: 20px;
-        }
-        
+        :root { --primary-color: #007AFF; --success-color: #34C759; --bg-color: #F2F2F7; --text-color: #1C1C1E; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        .container { width: 100%; max-width: 600px; background: white; padding: 30px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; margin-top: 20px; }
         h1 { font-size: 2.2rem; margin-bottom: 5px; color: #333; }
         p { font-size: 1.2rem; color: #666; margin-bottom: 30px; }
-
-        /* כפתורים */
-        .buttons-row { 
-            display: flex; 
-            flex-direction: column; 
-            gap: 15px; 
-            align-items: center;
-        }
-
-        .big-button {
-            border: none; 
-            color: white; 
-            width: 100%; 
-            max-width: 350px;
-            height: 90px;
-            font-size: 1.6rem;
-            font-weight: bold;
-            border-radius: 20px; 
-            cursor: pointer; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center;
-            gap: 15px;
-            transition: transform 0.2s;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
-        }
-
+        .buttons-row { display: flex; flex-direction: column; gap: 15px; align-items: center;}
+        .big-button { border: none; color: white; width: 100%; max-width: 350px; height: 90px; font-size: 1.6rem; font-weight: bold; border-radius: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 15px; transition: transform 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
         .mic-btn { background-color: var(--primary-color); }
         .cam-btn { background-color: var(--success-color); }
         .big-button:active { transform: scale(0.96); }
+        
+        /* אנימציות */
+        .listening-waves { display: none; margin: 20px auto; height: 40px; align-items: center; justify-content: center; gap: 5px; }
+        .bar { width: 6px; background-color: #FF3B30; border-radius: 4px; animation: sound 0.6s infinite ease-in-out alternate; }
+        .bar:nth-child(2) { animation-delay: 0.2s; height: 25px; } .bar:nth-child(3) { animation-delay: 0.4s; height: 40px; }
+        @keyframes sound { 0% { height: 10px; opacity: 0.5; } 100% { height: 50px; opacity: 1; } }
+        
+        .thinking-dots { display: none; justify-content: center; align-items: center; gap: 10px; margin-top: 25px; margin-bottom: 25px; }
+        .dot { width: 15px; height: 15px; background-color: var(--primary-color); border-radius: 50%; animation: bounce 1.4s infinite ease-in-out both; }
+        .dot:nth-child(1) { animation-delay: -0.32s; } .dot:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
 
-        /* --- אנימציית הקשבה (גלים) --- */
-        .listening-waves {
-            display: none;
-            margin: 20px auto;
-            height: 40px;
-            align-items: center;
-            justify-content: center;
-            gap: 5px;
-        }
-        .bar {
-            width: 6px;
-            background-color: #FF3B30;
-            border-radius: 4px;
-            animation: sound 0.6s infinite ease-in-out alternate;
-        }
-        .bar:nth-child(2) { animation-delay: 0.2s; height: 25px; }
-        .bar:nth-child(3) { animation-delay: 0.4s; height: 40px; }
-        
-        @keyframes sound {
-            0% { height: 10px; opacity: 0.5; }
-            100% { height: 50px; opacity: 1; }
-        }
-
-        /* --- אנימציית חשיבה (נקודות קופצות) --- */
-        .thinking-dots {
-            display: none; /* מוסתר כברירת מחדל */
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
-            margin-top: 25px;
-            margin-bottom: 25px;
-        }
-        
-        .dot {
-            width: 15px;
-            height: 15px;
-            background-color: var(--primary-color);
-            border-radius: 50%;
-            animation: bounce 1.4s infinite ease-in-out both;
-        }
-        
-        .dot:nth-child(1) { animation-delay: -0.32s; }
-        .dot:nth-child(2) { animation-delay: -0.16s; }
-        
-        @keyframes bounce {
-            0%, 80%, 100% { transform: scale(0); }
-            40% { transform: scale(1); }
-        }
-
-        #status { 
-            margin-top: 15px; 
-            font-size: 1.3rem; 
-            color: #888; 
-            min-height: 25px; 
-            font-weight: 500;
-        }
-        
-        #response-area {
-            margin-top: 20px; 
-            font-size: 1.6rem;
-            line-height: 1.4;
-            color: #1C1C1E; 
-            background: #E5F1FF; 
-            padding: 20px; 
-            border-radius: 15px; 
-            display: none;
-            border-right: 5px solid var(--primary-color);
-            text-align: right;
-        }
-
-        #preview { 
-            max-width: 100%; 
-            margin-top: 20px; 
-            border-radius: 15px; 
-            display: none; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        }
+        #status { margin-top: 15px; font-size: 1.3rem; color: #888; min-height: 25px; font-weight: 500;}
+        #response-area { margin-top: 20px; font-size: 1.6rem; line-height: 1.4; color: #1C1C1E; background: #E5F1FF; padding: 20px; border-radius: 15px; display: none; border-right: 5px solid var(--primary-color); text-align: right; }
+        #preview { max-width: 100%; margin-top: 20px; border-radius: 15px; display: none; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
     </style>
 </head>
 <body>
-
 <div class="container">
     <h1>הנכד הדיגיטלי 👵</h1>
     <p>לחצי על הכפתור ודברי איתי</p>
     
     <div class="buttons-row">
-        <button id="micBtn" class="big-button mic-btn" onclick="startListening()">
-            <span>🎤</span>
-        </button>
-
+        <button id="micBtn" class="big-button mic-btn" onclick="startListening()"><span>🎤</span> אני מקשיב</button>
+        
         <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;" onchange="handleImageUpload(this)">
-        <button class="big-button cam-btn" onclick="document.getElementById('cameraInput').click()">
-            <span>📷</span> תראה לי
-        </button>
+        <button class="big-button cam-btn" onclick="openCamera()"><span>📷</span> תראה לי</button>
     </div>
 
-    <div id="listening-indicator" class="listening-waves">
-        <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
-    </div>
-
-    <div id="thinking-indicator" class="thinking-dots">
-        <div class="dot"></div>
-        <div class="dot"></div>
-        <div class="dot"></div>
-    </div>
+    <div id="listening-indicator" class="listening-waves"><div class="bar"></div><div class="bar"></div><div class="bar"></div></div>
+    <div id="thinking-indicator" class="thinking-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
     
     <img id="preview" src="" alt="Image preview">
     <div id="status"></div>
@@ -186,43 +59,40 @@
     const waves = document.getElementById('listening-indicator'); 
     const dots = document.getElementById('thinking-indicator');
     
-    // נגן האודיו הגלובלי
+    // נגן גלובלי
     const audioPlayer = new Audio();
 
-    // Wake Lock
     let wakeLock = null;
     async function requestWakeLock() { try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) { console.log(err); }}
 
-    // Speech Recognition
+    // --- לוגיקה חדשה למצלמה ---
+    function openCamera() {
+        // 1. זה הטריק: מפעילים אודיו ריק ברגע הלחיצה על הכפתור (לפני שהמצלמה נפתחת)
+        audioPlayer.src = 'data:audio/mp3;base64,';
+        audioPlayer.play().catch(() => {});
+        
+        // 2. רק עכשיו פותחים את המצלמה האמיתית
+        document.getElementById('cameraInput').click();
+    }
+
+    // Speech
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition(); 
     recognition.lang = 'he-IL'; 
     
-    // משתנה עזר לשינוי הטקסט בכפתור
     let isFirstTime = true;
 
     recognition.onstart = () => { 
-        statusDiv.innerText = "אני מקשיב לך..."; 
-        waves.style.display = 'flex'; 
-        dots.style.display = 'none'; 
-        responseDiv.style.display = 'none'; 
-        requestWakeLock(); 
+        statusDiv.innerText = "אני מקשיב לך..."; waves.style.display = 'flex'; dots.style.display = 'none'; responseDiv.style.display = 'none'; requestWakeLock(); 
     };
-
     recognition.onend = () => { 
-        // עדכון הכפתור לפעם הבאה
         if (isFirstTime) {
             const btnSpan = document.querySelector('#micBtn span');
-            if(btnSpan && btnSpan.nextSibling) {
-                btnSpan.nextSibling.textContent = " להמשך שיחה";
-            }
+            if(btnSpan && btnSpan.nextSibling) btnSpan.nextSibling.textContent = " להמשך שיחה";
             isFirstTime = false;
         }
-
-        statusDiv.innerText = ""; 
-        waves.style.display = 'none'; 
+        statusDiv.innerText = ""; waves.style.display = 'none'; 
     };
-
     recognition.onresult = (e) => { 
         const text = e.results[0][0].transcript; 
         statusDiv.innerText = "שמעתי: " + text; 
@@ -230,25 +100,17 @@
     };
 
     function startListening() { 
-        // --- התיקון למובייל מתחיל כאן ---
-        // ברגע הלחיצה, אנחנו מנגנים "כלום" כדי לשחרר את חסימת האודיו
-        audioPlayer.src = 'data:audio/mp3;base64,'; // קובץ ריק
-        audioPlayer.play().catch(() => {}); // מתעלמים משגיאות אם יש
-        // --- סוף התיקון ---
-
+        audioPlayer.src = 'data:audio/mp3;base64,'; // שחרור חסימה גם כאן
+        audioPlayer.play().catch(() => {});
         recognition.start(); 
     }
 
-    // Camera Logic
+    // Camera Upload Handling
     function handleImageUpload(input) { 
         if (input.files && input.files[0]) { 
             const file = input.files[0]; 
             const reader = new FileReader(); 
             
-            // גם כאן משחררים את האודיו
-            audioPlayer.src = 'data:audio/mp3;base64,';
-            audioPlayer.play().catch(() => {});
-
             statusDiv.innerText = "מעבד תמונה..."; 
             requestWakeLock(); 
             reader.onload = function(e) { 
@@ -260,13 +122,12 @@
         }
     }
 
-    // Backend Logic
+    // Backend
     async function sendToBackend(text, imageBase64) {
         responseDiv.style.display = 'none'; 
         statusDiv.innerText = "הנכד חושב..."; 
         dots.style.display = 'flex'; 
         
-        // עצירת דיבור קודם אם יש
         audioPlayer.pause();
         audioPlayer.currentTime = 0;
 
@@ -284,9 +145,9 @@
             responseDiv.innerText = data.answer;
             
             if (data.audio) { 
-                // שימוש באותו נגן שכבר "שוחרר" קודם
+                // שימוש באותו נגן ששוחרר קודם
                 audioPlayer.src = "data:audio/mp3;base64," + data.audio;
-                audioPlayer.play().catch(e => console.error("Audio play failed:", e)); 
+                audioPlayer.play().catch(e => console.error("Play error:", e)); 
             }
         } catch (error) { 
             console.error(error); 
@@ -296,6 +157,5 @@
         }
     }
 </script>
-
 </body>
 </html>
