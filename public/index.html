@@ -11,6 +11,7 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
             background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; 
             display: flex; flex-direction: column; align-items: center; min-height: 100vh; 
+            user-select: none; -webkit-user-select: none;
         }
 
         .container { width: 100%; max-width: 600px; background: white; padding: 30px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; margin-top: 20px; }
@@ -24,6 +25,7 @@
             font-size: 1.6rem; font-weight: bold; border-radius: 20px; cursor: pointer; 
             display: flex; align-items: center; justify-content: center; gap: 15px; 
             transition: all 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.15); 
+            touch-action: manipulation; /* שיפור תגובה במובייל */
         }
         
         .mic-btn { background-color: var(--primary-color); }
@@ -98,39 +100,47 @@
     
     const audioPlayer = new Audio();
     let wakeLock = null;
-    let isRecording = false; // המצב הנוכחי
+    let isRecording = false;
+    let finalTranscript = ""; // משתנה לשמירת הטקסט
 
     async function requestWakeLock() { try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) { console.log(err); }}
 
-    // --- לוגיקה חדשה: Toggle (התחל/עצור) ---
+    // --- לוגיקה: התחל / עצור ושלח ---
     function toggleRecording() {
         if (!isRecording) {
-            // התחלה
             startRecord();
         } else {
-            // עצירה
-            stopRecord();
+            stopAndSend();
         }
     }
 
     function startRecord() {
         isRecording = true;
+        finalTranscript = ""; // איפוס טקסט קודם
+        
         micBtn.classList.add('recording'); // צבע אדום
         micBtn.innerHTML = "<span>⏹️</span> סיימתי לדבר"; 
         
-        // שחרור חסימת אודיו באייפון
+        // טריק לשחרור אודיו באייפון
         audioPlayer.src = 'data:audio/mp3;base64,';
         audioPlayer.play().catch(() => {});
 
         try { recognition.start(); } catch (err) { console.log("Already started"); }
     }
 
-    function stopRecord() {
+    function stopAndSend() {
         isRecording = false;
         micBtn.classList.remove('recording'); // חזרה לכחול
         micBtn.innerHTML = "<span>🎤</span> לחצי ודברי";
         
         try { recognition.stop(); } catch(err) { console.log(err); }
+        
+        // אם יש טקסט - שולחים אותו עכשיו
+        if (finalTranscript.trim().length > 0) {
+            sendToBackend(finalTranscript, null);
+        } else {
+            statusDiv.innerText = "לא שמעתי כלום, נסי שוב.";
+        }
     }
 
     // --- מצלמה ---
@@ -144,40 +154,42 @@
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition(); 
     recognition.lang = 'he-IL'; 
-    recognition.interimResults = false;
-    // חשוב: לא עוצרים אוטומטית בשקט, אלא מחכים ללחיצה של המשתמש
-    recognition.continuous = true; 
+    recognition.interimResults = true; // כדי שנראה את הטקסט נכתב בזמן אמת
+    recognition.continuous = true;     // לא עוצר לבד! רק בלחיצה
     
     recognition.onstart = () => { 
         statusDiv.innerText = "מקשיב..."; waves.style.display = 'flex'; dots.style.display = 'none'; responseDiv.style.display = 'none'; requestWakeLock(); 
     };
 
     recognition.onend = () => { 
-        // אם ה-API עצר לבד (למשל בגלל תקלה או שתיקה ארוכה מדי), נאפס את הכפתור
+        // אם ה-API עצר לבד (למשל תקלה) אבל המשתמש לא לחץ "סיימתי"
+        // אנחנו רק מעדכנים את הכפתור ויזואלית, אבל לא שולחים סתם
         if (isRecording) {
-            // שולחים את מה שנצבר עד כה? אוטומטית זה ישלח ב-onresult
             isRecording = false;
             micBtn.classList.remove('recording');
             micBtn.innerHTML = "<span>🎤</span> לחצי ודברי";
             waves.style.display = 'none';
+            // אפשר להוסיף כאן שליחה אוטומטית אם רוצים, אבל עדיף שלא כדי למנוע את הבאג הקודם
         }
     };
 
     recognition.onresult = (e) => { 
-        // בגלל continuous=true, צריך לקחת את התוצאה האחרונה
-        const lastIndex = e.results.length - 1;
-        const text = e.results[lastIndex][0].transcript;
+        // אוספים את הטקסט אבל *לא* שולחים אותו עדיין
+        let interimTranscript = '';
+        for (let i = e.resultIndex; i < e.results.length; ++i) {
+            if (e.results[i].isFinal) {
+                finalTranscript += e.results[i][0].transcript;
+            } else {
+                interimTranscript += e.results[i][0].transcript;
+            }
+        }
+        // מציגים למשתמש מה שמענו בינתיים
+        statusDiv.innerText = "שמעתי: " + finalTranscript + interimTranscript; 
         
-        // עוצרים את ההקלטה אם קיבלנו תוצאה (או שאפשר להמשיך להקליט עד לחיצה)
-        // בגישה שלנו: סבתא לחצה "סיימתי" -> זה יפעיל stop() -> ואז onresult יגיע.
-        // אבל לפעמים onresult מגיע תוך כדי דיבור.
-        // כדי למנוע כפילויות, נשלח רק אם המשתמש לחץ "עצור" או שהמערכת זיהתה משפט שלם.
-        
-        statusDiv.innerText = "שמעתי: " + text; 
-        
-        // נבצע עצירה יזומה ומשלוח
-        stopRecord(); 
-        sendToBackend(text, null); 
+        // עדכון המשתנה הגלובלי במקרה של משפט קצר
+        if (!finalTranscript && interimTranscript) {
+            finalTranscript = interimTranscript;
+        }
     };
 
     // Camera Upload
