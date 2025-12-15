@@ -5,17 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>הנכד הדיגיטלי</title>
     <style>
-        :root { --primary-color: #007AFF; --success-color: #34C759; --bg-color: #F2F2F7; --text-color: #1C1C1E; }
+        :root { --primary-color: #007AFF; --success-color: #34C759; --bg-color: #F2F2F7; --text-color: #1C1C1E; --recording-color: #FF3B30; }
         
         body { 
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
             background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; 
             display: flex; flex-direction: column; align-items: center; min-height: 100vh; 
-            
-            /* מונע סימון טקסט בכל העמוד - קריטי לנייד */
-            user-select: none; 
-            -webkit-user-select: none; 
-            -webkit-touch-callout: none;
         }
 
         .container { width: 100%; max-width: 600px; background: white; padding: 30px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; margin-top: 20px; }
@@ -28,31 +23,30 @@
             border: none; color: white; width: 100%; max-width: 350px; height: 90px; 
             font-size: 1.6rem; font-weight: bold; border-radius: 20px; cursor: pointer; 
             display: flex; align-items: center; justify-content: center; gap: 15px; 
-            transition: transform 0.1s, background-color 0.2s; 
-            box-shadow: 0 4px 10px rgba(0,0,0,0.15); 
-            
-            /* קריטי לנייד: מונע עיכובים והתנגשויות */
-            touch-action: none; 
-            -webkit-user-select: none;
-            -webkit-touch-callout: none;
+            transition: all 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.15); 
         }
         
         .mic-btn { background-color: var(--primary-color); }
-        .mic-btn:active, .mic-btn.pressed { background-color: #0056b3; transform: scale(0.96); }
         
+        /* מצב הקלטה פעיל - אדום ומהבהב */
+        .mic-btn.recording { 
+            background-color: var(--recording-color); 
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+
         .cam-btn { background-color: var(--success-color); }
         .cam-btn:active { transform: scale(0.96); }
         
-        /* כפתור הניהול החדש */
+        /* כפתור הניהול */
         .admin-link {
-            display: inline-block;
-            margin-top: 30px;
-            color: #999;
-            text-decoration: none;
-            font-size: 0.9rem;
-            padding: 10px;
-            border: 1px solid #eee;
-            border-radius: 10px;
+            display: inline-block; margin-top: 30px; color: #999; text-decoration: none;
+            font-size: 0.9rem; padding: 10px; border: 1px solid #eee; border-radius: 10px;
         }
         .admin-link:hover { background: #f9f9f9; color: #333; }
 
@@ -75,10 +69,10 @@
 <body>
 <div class="container">
     <h1>הנכד הדיגיטלי 👵</h1>
-    <p>לחצי והחזיקי כדי לדבר</p>
+    <p>לחצי כדי לדבר, ולחצי שוב לסיום</p>
     
     <div class="buttons-row">
-        <button id="micBtn" class="big-button mic-btn" oncontextmenu="return false;"><span>🎤</span> החזיקי ודברי</button>
+        <button id="micBtn" class="big-button mic-btn" onclick="toggleRecording()"><span>🎤</span> לחצי ודברי</button>
         
         <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;" onchange="handleImageUpload(this)">
         <button class="big-button cam-btn" onclick="openCamera()"><span>📷</span> תראה לי</button>
@@ -104,53 +98,40 @@
     
     const audioPlayer = new Audio();
     let wakeLock = null;
-    let isRecording = false;
+    let isRecording = false; // המצב הנוכחי
 
     async function requestWakeLock() { try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) { console.log(err); }}
 
-    // --- לוגיקה חדשה: Push to Talk עם תיקון לנייד ---
-    
-    function startRecord(e) {
-        // מניעת התנהגות דפדפן רגילה (כמו גלילה או בחירת טקסט)
-        if (e.type === 'touchstart' || e.type === 'touchmove') {
-            e.preventDefault(); 
+    // --- לוגיקה חדשה: Toggle (התחל/עצור) ---
+    function toggleRecording() {
+        if (!isRecording) {
+            // התחלה
+            startRecord();
+        } else {
+            // עצירה
+            stopRecord();
         }
-        
-        if (isRecording) return;
-        
-        isRecording = true;
-        micBtn.classList.add('pressed');
-        micBtn.innerHTML = "<span>👂</span> אני מקשיב..."; 
+    }
 
+    function startRecord() {
+        isRecording = true;
+        micBtn.classList.add('recording'); // צבע אדום
+        micBtn.innerHTML = "<span>⏹️</span> סיימתי לדבר"; 
+        
+        // שחרור חסימת אודיו באייפון
         audioPlayer.src = 'data:audio/mp3;base64,';
         audioPlayer.play().catch(() => {});
 
-        try { recognition.start(); } catch (err) { console.log("Recognition started already"); }
+        try { recognition.start(); } catch (err) { console.log("Already started"); }
     }
 
-    function stopRecord(e) {
-        // גם כאן מונעים התנהגות ברירת מחדל
-        if (e && (e.type === 'touchend' || e.type === 'touchcancel')) {
-            e.preventDefault();
-        }
-
-        if (!isRecording) return;
+    function stopRecord() {
         isRecording = false;
-        
-        micBtn.classList.remove('pressed');
-        micBtn.innerHTML = "<span>🎤</span> החזיקי ודברי";
+        micBtn.classList.remove('recording'); // חזרה לכחול
+        micBtn.innerHTML = "<span>🎤</span> לחצי ודברי";
         
         try { recognition.stop(); } catch(err) { console.log(err); }
     }
-
-    // חיבור אירועים - כולל מגע למובייל
-    micBtn.addEventListener('mousedown', startRecord);
-    micBtn.addEventListener('touchstart', startRecord, { passive: false }); // passive: false חשוב ל-preventDefault
-
-    micBtn.addEventListener('mouseup', stopRecord);
-    micBtn.addEventListener('touchend', stopRecord, { passive: false });
-    micBtn.addEventListener('touchcancel', stopRecord); // אם האצבע מחליקה החוצה
-    micBtn.addEventListener('mouseleave', stopRecord);
 
     // --- מצלמה ---
     function openCamera() {
@@ -159,28 +140,43 @@
         document.getElementById('cameraInput').click();
     }
 
-    // Speech Setup
+    // הגדרות זיהוי דיבור
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition(); 
     recognition.lang = 'he-IL'; 
     recognition.interimResults = false;
+    // חשוב: לא עוצרים אוטומטית בשקט, אלא מחכים ללחיצה של המשתמש
+    recognition.continuous = true; 
     
     recognition.onstart = () => { 
         statusDiv.innerText = "מקשיב..."; waves.style.display = 'flex'; dots.style.display = 'none'; responseDiv.style.display = 'none'; requestWakeLock(); 
     };
 
     recognition.onend = () => { 
-        if (isRecording) { // מקרה קצה שהזיהוי נפסק לבד
+        // אם ה-API עצר לבד (למשל בגלל תקלה או שתיקה ארוכה מדי), נאפס את הכפתור
+        if (isRecording) {
+            // שולחים את מה שנצבר עד כה? אוטומטית זה ישלח ב-onresult
             isRecording = false;
-            micBtn.classList.remove('pressed');
-            micBtn.innerHTML = "<span>🎤</span> החזיקי ודברי";
+            micBtn.classList.remove('recording');
+            micBtn.innerHTML = "<span>🎤</span> לחצי ודברי";
+            waves.style.display = 'none';
         }
-        statusDiv.innerText = ""; waves.style.display = 'none'; 
     };
 
     recognition.onresult = (e) => { 
-        const text = e.results[0][0].transcript; 
+        // בגלל continuous=true, צריך לקחת את התוצאה האחרונה
+        const lastIndex = e.results.length - 1;
+        const text = e.results[lastIndex][0].transcript;
+        
+        // עוצרים את ההקלטה אם קיבלנו תוצאה (או שאפשר להמשיך להקליט עד לחיצה)
+        // בגישה שלנו: סבתא לחצה "סיימתי" -> זה יפעיל stop() -> ואז onresult יגיע.
+        // אבל לפעמים onresult מגיע תוך כדי דיבור.
+        // כדי למנוע כפילויות, נשלח רק אם המשתמש לחץ "עצור" או שהמערכת זיהתה משפט שלם.
+        
         statusDiv.innerText = "שמעתי: " + text; 
+        
+        // נבצע עצירה יזומה ומשלוח
+        stopRecord(); 
         sendToBackend(text, null); 
     };
 
