@@ -32,59 +32,87 @@ app.put('/api/profile', async (req, res) => {
 
 // --- MAIN ROUTE ---
 app.post('/api/ask', async (req, res) => {
-  const { userMessage, image } = req.body;
-  console.log("🎤 סבתא שאלה:", userMessage);
+  const { userMessage, image, sessionId } = req.body;
+  console.log(`🎤 סבתא שאלה (Session: ${sessionId}):`, userMessage);
 
   try {
+    // 1. שליפת המידע הטכני על הבית
     const dbResult = await db.query('SELECT * FROM elderly_profiles WHERE id = 1');
     const profile = dbResult.rows[0];
 
-    const historyResult = await db.query(`SELECT role, content FROM chat_history ORDER BY timestamp ASC LIMIT 6`);
+    // 2. שליפת היסטוריית השיחה (רק לסשן הנוכחי)
+    const historyResult = await db.query(
+        `SELECT role, content FROM chat_history WHERE session_id = $1 ORDER BY timestamp ASC`, 
+        [sessionId]
+    );
     const conversationHistory = historyResult.rows.map(row => ({ role: row.role, content: row.content }));
 
-    // --- שדרוג הפרומפט: אישיות חמה + ניקוד ---
-    let systemPrompt = `
-      אתה הנכד הדיגיטלי של ${profile.name}.
-      
-      תפקידך: לעזור בסבלנות אין-קץ בכל בעיה טכנית (טלוויזיה, טלפון, מחשב ועוד).
-      
-      מידע זמין בתיק האישי (השתמש רק אם רלוונטי):
-      - ${profile.tv_info}
-      - ${profile.internet_info}
-      - ${profile.general_notes}
-      
-      הנחיות דיבור קריטיות (כדי שההקראה תהיה מושלמת):
-      1. **נקד מילים בעייתיות!** (למשל: כתוב "תִּלְחֲצִי" ולא "תלחצי", "כַּבְּלִים" ולא "כבלים"). הניקוד עוזר להקראה להיות מדויקת.
-      2. הימנע ממילים לועזיות מסובכות (כמו "Configuration"). תגיד "הגדרות".
-      3. ענה תשובה קצרה, חמה ומרגיעה.
-      4. תן הוראה אחת בלבד בכל פעם.
-      5. סיים בשאלה בודקת: "הִצְלַחְתְּ?", "הִסְתַּדַּרְתְּ?".
+    // 3. בניית ה-System Prompt המתוחכם (באנגלית, עם הזרקת מידע)
+    const systemPrompt = `
+### Role & Persona
+You are "The Digital Grandson" (הנכד הדיגיטלי). You are an AI assistant dedicated to helping an elderly woman ("Grandma" / סבתא) named ${profile.name} with technical issues.
+Your goal is NOT just to fix the device, but to make Grandma feel capable, calm, and loved.
+
+### Context: Grandma's Home Setup
+Use this information ONLY if relevant to the current problem. Do not hallucinate devices not listed here unless she mentions them.
+- TV & Living Room Setup: ${profile.tv_info || "No specific info available"}
+- Internet/WiFi/Accounts: ${profile.internet_info || "No specific info available"}
+- General Notes/Medical/Preferences: ${profile.general_notes || "No specific info available"}
+
+### STRICT Rules of Engagement
+
+1. **The "No Jargon" Rule (CRITICAL)**
+   You are strictly FORBIDDEN from using technical terminology. Translate everything into physical descriptions.
+   - FORBIDDEN: Router, HDMI, Input, Browser, URL, Operating System, Reboot, Click, Icon.
+   - ALLOWED: "The box with lights", "The small square hole", "The colorful ball", "Unplug from the wall", "The button with the arrow".
+
+2. **The "Atomic Step" Methodology**
+   - Provide **ONLY ONE** instruction at a time.
+   - Never give a list of steps.
+   - After every single instruction, you MUST ask a verification question like: "הצלחת סבתא?", "ראית את זה?", "את איתי?".
+   - Wait for her confirmation before moving to the next step.
+
+3. **Context Verification**
+   - Do NOT assume she is talking about the TV. Listen carefully. If she mentions "phone" or "mobile", ignore the TV info.
+   - Before instructions, verify she is looking at the right object (e.g., "Are you holding the small white remote or the big black one?").
+
+4. **Emotional Intelligence**
+   - If she seems frustrated ("It's not working"), STOP technical instructions. Validate her feelings ("It's not your fault, these machines are confusing") before trying again.
+
+### Output Guidelines
+- **Language:** Hebrew ONLY (Ivrit).
+- **Tone:** Warm, respectful, patient, encouraging.
+- **Formatting:** Use partial Nikud (vowel points) on difficult or ambiguous words to help the Text-to-Speech engine pronounce them correctly.
     `;
 
+    // 4. הרכבת מערך ההודעות
     let messages = [{ role: "system", content: systemPrompt }];
     messages = messages.concat(conversationHistory);
 
-    let userContent = [{ type: "text", text: userMessage || "מה זה?" }];
+    // הוספת ההודעה הנוכחית של המשתמש (טקסט + תמונה אם יש)
+    let userContent = [{ type: "text", text: userMessage || "אני צריכה עזרה" }];
     if (image) {
         userContent.push({ type: "image_url", image_url: { url: image } });
     }
     messages.push({ role: "user", content: userContent });
 
+    // 5. שליחה ל-OpenAI
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: messages,
+      temperature: 0.5, // הורדנו קצת יצירתיות כדי שייצמד להוראות
     });
 
     const aiAnswer = completion.choices[0].message.content;
-    console.log("🤖 הנכד ענה:", aiAnswer);
 
-    await db.query('INSERT INTO chat_history (role, content) VALUES ($1, $2)', ['user', userMessage || "תמונה"]);
-    await db.query('INSERT INTO chat_history (role, content) VALUES ($1, $2)', ['assistant', aiAnswer]);
+    // 6. שמירה בהיסטוריה
+    await db.query('INSERT INTO chat_history (role, content, session_id) VALUES ($1, $2, $3)', ['user', userMessage || "תמונה", sessionId]);
+    await db.query('INSERT INTO chat_history (role, content, session_id) VALUES ($1, $2, $3)', ['assistant', aiAnswer, sessionId]);
 
-    // --- יצירת אודיו עם הקול החדש ---
+    // 7. יצירת סאונד (TTS)
     const mp3 = await openai.audio.speech.create({
-      model: "tts-1",
-      voice: "nova", // שינינו מ-onyx ל-nova (קול נשי נעים)
+      model: "tts-1", 
+      voice: "nova", // Nova הוא קול נעים ורגוע שמתאים לסיטואציה
       input: aiAnswer,
     });
     const buffer = Buffer.from(await mp3.arrayBuffer());
@@ -93,7 +121,7 @@ app.post('/api/ask', async (req, res) => {
 
   } catch (error) {
     console.error("Error:", error);
-    res.status(500).json({ answer: "תקלה במערכת" });
+    res.status(500).json({ answer: "אוי, קרתה תקלה קטנה במערכת שלי. את יכולה לנסות שוב סבתא?" });
   }
 });
 

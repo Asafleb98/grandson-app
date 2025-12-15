@@ -44,23 +44,13 @@
         }
         
         .mic-btn { background-color: var(--primary-color); }
+        .mic-btn.recording { background-color: var(--recording-color); animation: pulse 1.5s infinite; }
         
-        /* מצב הקלטה פעיל - אדום ומהבהב */
-        .mic-btn.recording { 
-            background-color: var(--recording-color); 
-            animation: pulse 1.5s infinite;
-        }
-        
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.02); }
-            100% { transform: scale(1); }
-        }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
 
         .cam-btn { background-color: var(--success-color); }
         .cam-btn:active { transform: scale(0.96); }
         
-        /* אזור התשובה והחשיבה */
         #response-area { 
             margin-top: 20px; font-size: 1.6rem; line-height: 1.4; 
             color: #1C1C1E; background: #E5F1FF; padding: 20px; 
@@ -68,27 +58,14 @@
             border-right: 5px solid var(--primary-color); text-align: right; 
         }
 
-        /* אנימציית החשיבה (הנקודות) */
-        .thinking-dots { 
-            display: none; /* מוסתר כברירת מחדל */
-            justify-content: center; align-items: center; gap: 10px; 
-            margin-top: 25px; margin-bottom: 25px; 
-        }
-        .dot { 
-            width: 15px; height: 15px; background-color: var(--primary-color); 
-            border-radius: 50%; animation: bounce 1.4s infinite ease-in-out both; 
-        }
-        .dot:nth-child(1) { animation-delay: -0.32s; } 
-        .dot:nth-child(2) { animation-delay: -0.16s; }
+        .thinking-dots { display: none; justify-content: center; align-items: center; gap: 10px; margin-top: 25px; margin-bottom: 25px; }
+        .dot { width: 15px; height: 15px; background-color: var(--primary-color); border-radius: 50%; animation: bounce 1.4s infinite ease-in-out both; }
+        .dot:nth-child(1) { animation-delay: -0.32s; } .dot:nth-child(2) { animation-delay: -0.16s; }
         
-        @keyframes bounce { 
-            0%, 80%, 100% { transform: scale(0); } 
-            40% { transform: scale(1); } 
-        }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
 
         #status { margin-top: 15px; font-size: 1.3rem; color: #888; min-height: 25px; font-weight: 500;}
         #preview { max-width: 100%; margin-top: 20px; border-radius: 15px; display: none; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        
         .admin-link { display: inline-block; margin-top: 30px; color: #999; text-decoration: none; font-size: 0.9rem; padding: 10px; border: 1px solid #eee; border-radius: 10px; }
     </style>
 </head>
@@ -99,30 +76,28 @@
     
     <div class="buttons-row">
         <button id="micBtn" class="big-button mic-btn" onclick="toggleRecording()"><span>🎤</span> לחצי ודברי</button>
-        
         <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;" onchange="handleImageUpload(this)">
         <button class="big-button cam-btn" onclick="openCamera()"><span>📷</span> תראה לי</button>
     </div>
 
-    <div id="thinking-indicator" class="thinking-dots">
-        <div class="dot"></div><div class="dot"></div><div class="dot"></div>
-    </div>
-    
+    <div id="thinking-indicator" class="thinking-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
     <img id="preview" src="" alt="Image preview">
     <div id="status"></div>
-    
     <div id="response-area"></div>
-
     <a href="/admin.html" class="admin-link">⚙️ עריכת פרופיל נכד</a>
 </div>
 
 <script>
+    // --- יצירת מזהה שיחה ייחודי לרענון הנוכחי ---
+    // בכל פעם שמרעננים, המספר הזה משתנה והשרת מקבל "דף חלק"
+    const sessionId = Date.now().toString() + Math.random().toString(36).substring(7);
+    console.log("Current Session ID:", sessionId);
+
     const statusDiv = document.getElementById('status'); 
     const responseDiv = document.getElementById('response-area');
     const previewImg = document.getElementById('preview');
     const dots = document.getElementById('thinking-indicator');
     const micBtn = document.getElementById('micBtn');
-    
     const audioPlayer = new Audio();
     let wakeLock = null;
     let isRecording = false;
@@ -130,58 +105,36 @@
 
     async function requestWakeLock() { try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) { console.log(err); }}
 
-    // --- לוגיקה: Toggle (התחל / עצור ושלח) ---
     function toggleRecording() {
-        if (!isRecording) {
-            startRecord();
-        } else {
-            stopAndSend();
-        }
+        if (!isRecording) startRecord();
+        else stopAndSend();
     }
 
     function startRecord() {
         isRecording = true;
         finalTranscript = ""; 
-        
-        // עדכון כפתור
         micBtn.classList.add('recording'); 
         micBtn.innerHTML = "<span>⏹️</span> סיימתי לדבר"; 
-        
-        // הסתרת תשובה קודמת והצגת סטטוס
         responseDiv.style.display = 'none';
         statusDiv.innerText = "אני מקשיב...";
-        
-        // שחרור אודיו (ביפ שקט כדי לשחרר חסימה)
-        audioPlayer.src = 'data:audio/mp3;base64,';
-        audioPlayer.play().catch(() => {});
-
+        audioPlayer.src = 'data:audio/mp3;base64,'; audioPlayer.play().catch(() => {});
         try { recognition.start(); } catch (err) { console.log("Already started"); }
     }
 
     function stopAndSend() {
         isRecording = false;
-        
-        // עדכון כפתור
         micBtn.classList.remove('recording'); 
         micBtn.innerHTML = "<span>🎤</span> לחצי ודברי";
-        
         try { recognition.stop(); } catch(err) { console.log(err); }
-        
-        if (finalTranscript.trim().length > 0) {
-            sendToBackend(finalTranscript, null);
-        } else {
-            statusDiv.innerText = "לא שמעתי כלום, נסי שוב.";
-        }
+        if (finalTranscript.trim().length > 0) sendToBackend(finalTranscript, null);
+        else statusDiv.innerText = "לא שמעתי כלום, נסי שוב.";
     }
 
-    // --- מצלמה ---
     function openCamera() {
-        audioPlayer.src = 'data:audio/mp3;base64,';
-        audioPlayer.play().catch(() => {});
+        audioPlayer.src = 'data:audio/mp3;base64,'; audioPlayer.play().catch(() => {});
         document.getElementById('cameraInput').click();
     }
 
-    // Speech Recognition
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition(); 
     recognition.lang = 'he-IL'; 
@@ -189,19 +142,13 @@
     recognition.continuous = true;     
     
     recognition.onstart = () => { requestWakeLock(); };
-
     recognition.onresult = (e) => { 
         let interimTranscript = '';
         for (let i = e.resultIndex; i < e.results.length; ++i) {
-            if (e.results[i].isFinal) {
-                finalTranscript += e.results[i][0].transcript;
-            } else {
-                interimTranscript += e.results[i][0].transcript;
-            }
+            if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript;
+            else interimTranscript += e.results[i][0].transcript;
         }
         statusDiv.innerText = "שומע: " + finalTranscript + interimTranscript; 
-        
-        // עדכון למקרה של משפט קצר
         if (!finalTranscript && interimTranscript) finalTranscript = interimTranscript;
     };
 
@@ -209,55 +156,33 @@
         if (input.files && input.files[0]) { 
             const file = input.files[0]; 
             const reader = new FileReader(); 
-            // חיווי עיבוד מיידי
-            statusDiv.innerText = "מעבד תמונה...";
-            dots.style.display = 'flex'; // הצגת נקודות חשיבה
-            
+            statusDiv.innerText = "מעבד תמונה..."; dots.style.display = 'flex'; 
             reader.onload = function(e) { 
-                previewImg.src = e.target.result; 
-                previewImg.style.display = 'block'; 
+                previewImg.src = e.target.result; previewImg.style.display = 'block'; 
                 sendToBackend("מה עושים עם זה?", e.target.result); 
             }; 
             reader.readAsDataURL(file); 
         }
     }
 
-    // --- פונקציית השליחה + חיווי חשיבה ---
     async function sendToBackend(text, imageBase64) {
-        // 1. איפוס התצוגה
-        responseDiv.style.display = 'none'; 
-        statusDiv.innerText = "הנכד חושב..."; 
-        
-        // 2. הפעלת האנימציה (הנקודות)
-        dots.style.display = 'flex'; 
-        
-        audioPlayer.pause(); 
-        audioPlayer.currentTime = 0;
+        responseDiv.style.display = 'none'; statusDiv.innerText = "הנכד חושב..."; dots.style.display = 'flex'; 
+        audioPlayer.pause(); audioPlayer.currentTime = 0;
 
         try {
+            // שולחים את ה-sessionId לשרת
             const res = await fetch('/api/ask', { 
                 method: 'POST', 
                 headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify({ userMessage: text, image: imageBase64 }) 
+                body: JSON.stringify({ userMessage: text, image: imageBase64, sessionId: sessionId }) 
             });
             const data = await res.json();
-            
-            // 3. כיבוי האנימציה והצגת התשובה
-            dots.style.display = 'none'; 
-            statusDiv.innerText = ""; 
-            
-            responseDiv.style.display = 'block'; 
-            responseDiv.innerText = data.answer; // כאן יוצג הטקסט המנוקד מהשרת
-            
-            if (data.audio) { 
-                audioPlayer.src = "data:audio/mp3;base64," + data.audio; 
-                audioPlayer.play().catch(e => console.error("Play error:", e)); 
-            }
+            dots.style.display = 'none'; statusDiv.innerText = ""; 
+            responseDiv.style.display = 'block'; responseDiv.innerText = data.answer; 
+            if (data.audio) { audioPlayer.src = "data:audio/mp3;base64," + data.audio; audioPlayer.play().catch(e => console.error("Play error:", e)); }
         } catch (error) { 
-            console.error(error); 
-            dots.style.display = 'none'; 
-            responseDiv.innerText = "יש תקלה בחיבור."; 
-            responseDiv.style.display = 'block'; 
+            console.error(error); dots.style.display = 'none'; 
+            responseDiv.innerText = "יש תקלה בחיבור."; responseDiv.style.display = 'block'; 
         }
     }
 </script>
