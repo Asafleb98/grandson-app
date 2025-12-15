@@ -1,5 +1,3 @@
-//psql 'postgresql://neondb_owner:npg_UBLgOxuV3ZG9@ep-icy-recipe-ag4pjor0-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
-
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -38,36 +36,30 @@ app.post('/api/ask', async (req, res) => {
   console.log("🎤 סבתא שאלה:", userMessage);
 
   try {
-    // 1. שליפת פרופיל
     const dbResult = await db.query('SELECT * FROM elderly_profiles WHERE id = 1');
     const profile = dbResult.rows[0];
 
-    // 2. שליפת היסטוריה
     const historyResult = await db.query(`SELECT role, content FROM chat_history ORDER BY timestamp ASC LIMIT 6`);
     const conversationHistory = historyResult.rows.map(row => ({ role: row.role, content: row.content }));
 
-    // 3. בניית הפרומפט
- // ... (שליפת הנתונים נשארת אותו דבר)
-
-    // 3. בניית הפרומפט המשודרג - פתוח לכל נושא
+    // --- שדרוג הפרומפט: אישיות חמה + ניקוד ---
     let systemPrompt = `
       אתה הנכד הדיגיטלי של ${profile.name}.
       
-      המשימה שלך: לעזור לה בכל בעיה טכנולוגית שיש לה (סמארטפון, מחשב, מיילים, טלוויזיה, מכשירי חשמל ועוד).
+      תפקידך: לעזור בסבלנות אין-קץ בכל בעיה טכנית (טלוויזיה, טלפון, מחשב ועוד).
       
-      יש לך גישה ל"תיק האישי" של הבית, השתמש בו **רק אם זה רלוונטי לשאלה**:
-      - מידע על סלון/בידור: ${profile.tv_info}
-      - מידע על אינטרנט/מחשב/חשבונות: ${profile.internet_info}
-      - הערות כלליות: ${profile.general_notes}
+      מידע זמין בתיק האישי (השתמש רק אם רלוונטי):
+      - ${profile.tv_info}
+      - ${profile.internet_info}
+      - ${profile.general_notes}
       
-      הנחיות קריטיות:
-      1. אם השאלה היא על נושא שאין לך מידע עליו (למשל "איך שולחים מייל"), תן תשובה כללית, נכונה ופשוטה שמתאימה לקשישים.
-      2. ענה תשובה קצרה, ברורה ומרגיעה בעברית מדוברת.
-      3. תן הוראה אחת פשוטה בכל פעם.
-      4. סיים תמיד בשאלה בודקת: "הסתדרת?", "הצלחת?", "איך הולך?".
+      הנחיות דיבור קריטיות (כדי שההקראה תהיה מושלמת):
+      1. **נקד מילים בעייתיות!** (למשל: כתוב "תִּלְחֲצִי" ולא "תלחצי", "כַּבְּלִים" ולא "כבלים"). הניקוד עוזר להקראה להיות מדויקת.
+      2. הימנע ממילים לועזיות מסובכות (כמו "Configuration"). תגיד "הגדרות".
+      3. ענה תשובה קצרה, חמה ומרגיעה.
+      4. תן הוראה אחת בלבד בכל פעם.
+      5. סיים בשאלה בודקת: "הִצְלַחְתְּ?", "הִסְתַּדַּרְתְּ?".
     `;
-    
-    // ... (המשך הקוד נשאר אותו דבר)
 
     let messages = [{ role: "system", content: systemPrompt }];
     messages = messages.concat(conversationHistory);
@@ -78,7 +70,6 @@ app.post('/api/ask', async (req, res) => {
     }
     messages.push({ role: "user", content: userContent });
 
-    // 4. שליחה ל-GPT
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: messages,
@@ -87,13 +78,14 @@ app.post('/api/ask', async (req, res) => {
     const aiAnswer = completion.choices[0].message.content;
     console.log("🤖 הנכד ענה:", aiAnswer);
 
-    // 5. שמירה בהיסטוריה
     await db.query('INSERT INTO chat_history (role, content) VALUES ($1, $2)', ['user', userMessage || "תמונה"]);
     await db.query('INSERT INTO chat_history (role, content) VALUES ($1, $2)', ['assistant', aiAnswer]);
 
-    // 6. יצירת אודיו
+    // --- יצירת אודיו עם הקול החדש ---
     const mp3 = await openai.audio.speech.create({
-      model: "tts-1", voice: "onyx", input: aiAnswer,
+      model: "tts-1",
+      voice: "nova", // שינינו מ-onyx ל-nova (קול נשי נעים)
+      input: aiAnswer,
     });
     const buffer = Buffer.from(await mp3.arrayBuffer());
 
